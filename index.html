@@ -19,7 +19,6 @@
       padding: 20px;
     }
 
-    /* Dark Card Container */
     .card {
       background: #0f172a;
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -70,6 +69,19 @@
 
     .follow-btn:active {
       transform: scale(0.95);
+    }
+
+    /* Following State Style */
+    .follow-btn.following {
+      background: #1e293b;
+      color: #94a3b8;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: none;
+    }
+
+    .follow-btn.following:hover {
+      background: #334155;
+      color: #ffffff;
     }
 
     /* Pop-up Modal */
@@ -150,8 +162,8 @@
   <!-- Pop-up Modal -->
   <div class="modal-overlay" id="popupModal">
     <div class="modal-box">
-      <h3>🎉 Thank You!</h3>
-      <p>You are now following!</p>
+      <h3 id="modalTitle">🎉 Thank You!</h3>
+      <p id="modalText">You are now following!</p>
       <button class="close-btn" id="closeBtn">Close</button>
     </div>
   </div>
@@ -172,7 +184,6 @@
       measurementId: "G-7CBDZX4WCD"
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     const counterRef = ref(db, 'followers');
@@ -181,29 +192,60 @@
     const followBtn = document.getElementById('followBtn');
     const popupModal = document.getElementById('popupModal');
     const closeBtn = document.getElementById('closeBtn');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalText = document.getElementById('modalText');
 
-    // Real-time listener to sync live counts across all active users
+    // Check local storage to see if this browser already followed
+    let isFollowing = localStorage.getItem('isFollowing') === 'true';
+
+    if (isFollowing) {
+      followBtn.innerText = 'Following';
+      followBtn.classList.add('following');
+    }
+
+    // Real-time listener to sync live counts
     onValue(counterRef, (snapshot) => {
       const val = snapshot.val();
       countElement.innerText = val !== null ? val : 4078;
     });
 
-    // Atomic transaction to increment follower count safely
+    // Handle follow / unfollow toggle
     followBtn.addEventListener('click', () => {
-      runTransaction(counterRef, (currentCount) => {
-        return (currentCount || 4078) + 1;
-      });
+      if (!isFollowing) {
+        // Increment count
+        runTransaction(counterRef, (currentCount) => {
+          return (currentCount || 4078) + 1;
+        });
+        isFollowing = true;
+        localStorage.setItem('isFollowing', 'true');
+        
+        followBtn.innerText = 'Following';
+        followBtn.classList.add('following');
 
-      // Show Pop-up Modal
-      popupModal.classList.add('active');
+        modalTitle.innerText = "🎉 Thank You!";
+        modalText.innerText = "You are now following this site!";
+        popupModal.classList.add('active');
+      } else {
+        // Decrement count (Unfollow)
+        runTransaction(counterRef, (currentCount) => {
+          return Math.max((currentCount || 4078) - 1, 0);
+        });
+        isFollowing = false;
+        localStorage.setItem('isFollowing', 'false');
+
+        followBtn.innerText = 'Follow';
+        followBtn.classList.remove('following');
+
+        modalTitle.innerText = "👋 Unfollowed";
+        modalText.innerText = "You have unfollowed this site.";
+        popupModal.classList.add('active');
+      }
     });
 
-    // Close Pop-up
     closeBtn.addEventListener('click', () => {
       popupModal.classList.remove('active');
     });
 
-    // Close Modal on clicking outside the box
     popupModal.addEventListener('click', (e) => {
       if (e.target === popupModal) {
         popupModal.classList.remove('active');
